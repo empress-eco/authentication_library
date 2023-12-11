@@ -3,12 +3,18 @@ import json
 import frappe
 import json
 import base64
+from frappe.utils.image import optimize_image
+import os
+from frappe.utils import cint
+from mimetypes import guess_type
+from typing import TYPE_CHECKING
 from werkzeug.wrappers import Response
 from frappe.utils.password import update_password as _update_password
 from frappe.utils import now
 import random
 from frappe.core.doctype.user.user import User
 from frappe.utils import get_url
+from frappe import _, is_whitelisted, ping
 from frappe.utils import (
 	now_datetime
 )
@@ -147,6 +153,17 @@ def get_user_name(user_email = None, mobile_phone = None):
         return  user_details
     else:
         return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')
+
+def check_user_name(user_email = None, mobile_phone = None):
+    if mobile_phone is not None:
+        user_details_mobile = frappe.get_list('User', filters={'mobile_no': mobile_phone}, fields=["name", "enabled"] )
+    if user_email is not None:
+        user_details_email = frappe.get_list('User', filters={'email': user_email}, fields=["name", "enabled"] )
+    if len(user_details_mobile) >=1 or len(user_details_email) >=1:
+        return  1
+    else:
+        return  0
+
              
 @frappe.whitelist()
 def is_user_available(user_email = None, mobile_phone = None):
@@ -182,9 +199,10 @@ def is_user_available(user_email = None, mobile_phone = None):
 
 @frappe.whitelist()
 def g_create_user(full_name, password, mobile_no, email,role=None):
-    
-    user_exists = get_user_name(user_email=email, mobile_phone=mobile_no)
-    return  Response(json.dumps({"message": user_exists , "user_count": 0}), status=500, mimetype='application/json')
+    # return "inside g_create_user"
+    # return check_user_name(user_email=email, mobile_phone=mobile_no)
+    if(check_user_name(user_email=email, mobile_phone=mobile_no)>0):
+        return  Response(json.dumps({"message": "User already exists" , "user_count": 1}), status=409, mimetype='application/json')
     
     try:
         frappe.get_doc({"doctype":"User",
@@ -262,4 +280,120 @@ def g_user_enable(username, email, mobile_no, enable_user: bool = True):
     except Exception as e:
         return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
 
- 
+def get_number_of_files(file_storage):
+    # Implement your logic to count the number of files
+    # Adjust this based on the actual structure of the FileStorage object
+    # For example, if FileStorage has a method to get the number of files, use that
+
+    # Example: Assuming a method called get_num_files() on FileStorage
+    if hasattr(file_storage, 'get_num_files') and callable(file_storage.get_num_files):
+        return file_storage.get_num_files()
+    else:
+        return 0  # Default to 0 if no specific method or attribute is available
+
+@frappe.whitelist(allow_guest=True)
+def time():
+    server_time = frappe.utils.now()
+    unix_time = frappe.utils.get_datetime(frappe.utils.now_datetime()).timestamp()
+    api_response = {
+        "data": {
+            "serverTime": server_time,
+            "unix_time": unix_time
+        }
+    }
+    return api_response
+
+
+@frappe.whitelist(allow_guest=True)
+def upload_file():
+    
+    user = None
+    if frappe.session.user == "Guest":
+        if frappe.get_system_settings("allow_guests_to_upload_files"):
+            ignore_permissions = True
+        else:
+            raise frappe.PermissionError
+    else:
+        user: "User" = frappe.get_doc("User", frappe.session.user)
+        ignore_permissions = False
+
+
+    files = frappe.request.files
+    file_names = []
+    urls = []
+    # filecount = 0
+    # for key, file in files.items():
+    #     filecount = filecount + 1
+    #     file_names.append(key)
+
+
+    # return file_names
+    
+    
+    is_private = frappe.form_dict.is_private
+    doctype = frappe.form_dict.doctype
+    docname = frappe.form_dict.docname
+    fieldname = frappe.form_dict.fieldname
+    file_url = frappe.form_dict.file_url
+    folder = frappe.form_dict.folder or "Home"
+    method = frappe.form_dict.method
+    filename = frappe.form_dict.file_name
+    optimize = frappe.form_dict.optimize
+    content = None
+    filenumber = 0
+    for key,file in files.items():
+                        filenumber = filenumber + 1
+                        file_names.append(key)
+                        file = files[key]
+                        content = file.stream.read()
+                        filename = file.filename
+
+                        content_type = guess_type(filename)[0]
+                        if optimize and content_type and content_type.startswith("image/"):
+                            args = {"content": content, "content_type": content_type}
+                            if frappe.form_dict.max_width:
+                                args["max_width"] = int(frappe.form_dict.max_width)
+                            if frappe.form_dict.max_height:
+                                args["max_height"] = int(frappe.form_dict.max_height)
+                            content = optimize_image(**args)
+
+                        frappe.local.uploaded_file = content
+                        frappe.local.uploaded_filename = filename
+
+                        if content is not None and (
+                            frappe.session.user == "Guest" or (user and not user.has_desk_access())
+                        ):
+                            filetype = guess_type(filename)[0]
+                            # if filetype not in ALLOWED_MIMETYPES:
+                            #     frappe.throw(_("You can only upload JPG, PNG, PDF, TXT or Microsoft documents."))
+
+                        if method:
+                            method = frappe.get_attr(method)
+                            is_whitelisted(method)
+                            return method()
+                        else:
+                            # return frappe.get_doc(
+                            doc = frappe.get_doc(
+                                {
+                                    "doctype": "File",
+                                    "attached_to_doctype": doctype,
+                                    "attached_to_name": docname,
+                                    "attached_to_field": fieldname,
+                                    "folder": folder,
+                                    "file_name": filename,
+                                    "file_url": file_url,
+                                    "is_private": cint(is_private),
+                                    "content": content,
+                                }
+                            ).save(ignore_permissions=ignore_permissions)
+                            urls.append(doc.file_url)
+                        
+                            if fieldname is not None:
+                                attach_field = frappe.get_doc(doctype, docname) #.save(ignore_permissions = True)
+                                setattr(attach_field, fieldname, doc.file_url)
+                                attach_field.save(ignore_permissions = True)
+                            
+                                
+    return urls
+
+
