@@ -485,11 +485,13 @@ def send_sms_twilio(phone_number,otp):
     try:
         import requests
         phone_number = "+974" + phone_number
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{get_sms_id('twilio')}/Messages.json"
+        parts = get_sms_id('twilio').split(":")
+
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{parts[0]}/Messages.json"
         payload = f'To={phone_number}&From=+18789999387&Body=Your%20DallahMzad%20Validation%20%20is%20{otp}%20Please%20use%20it%20on%20the%20site%20or%20App'
         headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic QUNiZmQyMDRkNDEwMTg4MmY2YTIwYzRlMDYxMzZkMmJiMzoyZmE4MjVkNGE2Mzk2MjYxYmNkMDVjOWZkMzAxZTI1OQ=='
+        'Authorization': f'Basic {parts[1]}'
         }
 
         response = requests.request("POST", url, headers=headers, data=payload)
