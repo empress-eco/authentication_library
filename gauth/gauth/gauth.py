@@ -185,7 +185,16 @@ def generate_custom_token_for_employee( password):
 @frappe.whitelist(allow_guest=True)
 def whoami():
         try:
-            return frappe.session.user
+            
+            # return {"data": "Guest"}
+            response_content = {
+                "data": 
+                    {
+                        "user": frappe.session.user,
+                    }
+            }
+            return Response(json.dumps(response_content), status=404, mimetype='application/json')
+            # return frappe.session.user
         except Exception as e:
              frappe.throw(error)
 
@@ -488,7 +497,7 @@ def send_sms_twilio(phone_number,otp):
         parts = get_sms_id('twilio').split(":")
 
         url = f"https://api.twilio.com/2010-04-01/Accounts/{parts[0]}/Messages.json"
-        payload = f'To={phone_number}&From=+18789999387&Body=Your%20DallahMzad%20Validation%20%20is%20{otp}%20Please%20use%20it%20on%20the%20site%20or%20App'
+        payload = f'To={phone_number}&From=+18789999387&Body=Your%20DallahMzad%OTP Verification code%20%20is%20{otp}%20Please%20use%20it%20on%20the%20site%20or%20App'
         headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': f'Basic {parts[1]}'
@@ -539,58 +548,74 @@ def make_payment_entry(
     reference
 ):
 
-	if amount == 0:
-		return "Amount not correct"
+    if amount == 0:
+        return "Amount not correct"
 
-	journal_entry = frappe.new_doc("Journal Entry")
-	journal_entry.posting_date = frappe.utils.now()
-	journal_entry.company = frappe.db.get_single_value("Global Defaults", "default_company")
-	journal_entry.voucher_type = "Journal Entry"
+    journal_entry = frappe.new_doc("Journal Entry")
+    journal_entry.posting_date = frappe.utils.now()
+    journal_entry.company = frappe.db.get_single_value("Global Defaults", "default_company")
+    journal_entry.voucher_type = "Journal Entry"
+    reference = reference + "  dated:  " + str(now_datetime())  + " Bid/Other document No: " + bid
+    journal_entry.remark = reference
+    debit_entry = {
+        # "account": "QIB Account - D",
+        "account": "1310 - Debtors - D",
+        "credit": amount,
+        "credit_in_account_currency": amount,
+        "account_currency": "QAR",
+        "reference_name": "",
+        "reference_type": "",
+        "reference_detail_no": "",
+        "cost_center": "",
+        "project": "",
+        "party_type": "Customer",
+        "party": user,
+        "is_advance": 0,
+        "reference_detail_no": reference
+    }
 
-	debit_entry = {
-		"account": "QIB Account - D",
-		"credit": amount,
-		"credit_in_account_currency": amount,
-		"account_currency": "QAR",
-		"reference_name": None,
-		"reference_type": "Journal Entry",
-		"reference_detail_no": "",
-		"cost_center": "",
-		"project": "",
-	}
-
-	credit_entry = {
-		"account": "1310 - Debtors - D",
-		"debit": amount,
-		"debit_in_account_currency": amount,
-		"account_currency": "QAR",
-		"reference_name": None,
-		"reference_type": "Journal Entry",
-		"reference_detail_no": "",
-		"cost_center": "",
-		"project": "",
-	}
+    credit_entry = {
+        "account": "QIB Account - D",
+        # "account": "1310 - Debtors - D",
+        "debit": amount,
+        "debit_in_account_currency": amount,
+        "account_currency": "QAR",
+        "reference_name": "",
+        "reference_type": "",
+        "reference_detail_no": "",
+        "cost_center": "",
+        "project": "",
+        "reference_detail_no": reference
+        # "party_type": "Customer",
+        # "party": "mumtaz@erpgulf.com422"
+        
+    }
 
 	# for dimension in get_accounting_dimensions():
 	# 	debit_entry.update({dimension: item.get(dimension)})
 
 	# 	credit_entry.update({dimension: item.get(dimension)})
 
-	journal_entry.append("accounts", debit_entry)
-	journal_entry.append("accounts", credit_entry)
+    journal_entry.append("accounts", debit_entry)
+    journal_entry.append("accounts", credit_entry)
 
-	try:
-		journal_entry.save(ignore_permissions=True)
+    try:
+            # a=10
+            journal_entry.save(ignore_permissions=True)
+            journal_entry.submit()
+            # if submit:
+            # journal_entry.submit()
 
-		# if submit:
-		# 	journal_entry.submit()
-
-		frappe.db.commit()
-	except Exception as e:
+            # frappe.db.commit()
+            return  Response(json.dumps({"data": "JV Successfully created ", "message": "" }), status=200, mimetype='application/json')
+    except Exception as e:
             frappe.db.rollback()
             frappe.log_error(title='Payment Entry failed to JV',message=frappe.get_traceback())
             frappe.flags.deferred_accounting_error = True
-            return  Response(json.dumps({"data": "null", "message": str(e) }), status=400, mimetype='application/json')
+            # return str(e)
+            return  Response(json.dumps({"data": "There was an error in creating JV", "message": "Use token with higher privilage to enter JV" }), status=401, mimetype='application/json')
+        
+
 
 @frappe.whitelist()
 def get_customer_details(user_email = None, mobile_phone = None):
