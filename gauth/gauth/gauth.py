@@ -2,6 +2,7 @@ import requests
 import json
 import frappe
 import json
+import urllib.parse;
 import base64
 from frappe.utils.image import optimize_image
 import os
@@ -37,6 +38,7 @@ def test_api():
 
 @frappe.whitelist(allow_guest=True)
 def generate_token_secure( api_key, api_secret, app_key):
+    # frappe.log_error(title='Login attempt',message=str(api_key) + str(api_secret) + str(app_key + "  "))
     try:
         try:
             app_key = base64.b64decode(app_key).decode("utf-8")
@@ -77,6 +79,8 @@ def generate_token_secure( api_key, api_secret, app_key):
         
 @frappe.whitelist(allow_guest=True)
 def generate_token_secure_for_users( username, password, app_key):
+    # return Response(json.dumps({"message": "2222 Security Parameters are not valid" , "user_count": 0}), status=401, mimetype='application/json')
+    frappe.log_error(title='Login attempt',message=str(username) + "    " + str(password) + "    " + str(app_key + "  "))
     try:
         try:
             app_key = base64.b64decode(app_key).decode("utf-8")
@@ -282,7 +286,7 @@ def g_create_user(full_name, password, mobile_no, email, id,role=None):
                         }).insert()
         
         
-        return g_generate_reset_password_key(email, send_email=False, password_expired=False)
+        return g_generate_reset_password_key(email, send_email=False, password_expired=False,mobile= mobile_no)
 
         # return  Response(json.dumps({"message": "User successfully created" , "user_count": 1}), status=200, mimetype='application/json')
         
@@ -304,7 +308,7 @@ def g_update_password(username, password):
         return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
     
 @frappe.whitelist()
-def g_generate_reset_password_key(user, send_email=False, password_expired=False):
+def g_generate_reset_password_key(user, send_email=False, password_expired=False, mobile ="55124924"):
     try:
         key  = str(random.randint(100000, 999999))
         doc2 = frappe.get_doc("User", user)
@@ -315,7 +319,7 @@ def g_generate_reset_password_key(user, send_email=False, password_expired=False
         url = "/update-password?key=" + key
         if password_expired:
             url = "/update-password?key=" + key + "&password_expired=true"
-
+        send_sms_expertexting(mobile,key)
         link = get_url(url)
         if send_email:
             User.password_reset_mail(link)
@@ -470,8 +474,9 @@ def send_sms_expertexting(phone_number,otp):
     try:
         phone_number = "+974" + phone_number
         url = "https://www.experttexting.com/ExptRestApi/sms/json/Message/Send"
-
-        payload = f'username={get_sms_id("experttexting")}&from=DEFAULT&to={phone_number}&text=Your%20validation%20code%20for%20DallahMzad%20is%20{otp}%20Thank%20You.'
+        message_text = urllib.parse.quote(f"Your validation code for DallahMzad is {otp} Thank You.  \n \n  رمز التحقق الخاص بك لـ DallahMzad هو {otp} شكرًا لك.")
+        # payload = f'username={get_sms_id("experttexting")}&from=DEFAULT&to={phone_number}&text=Your%20validation%20code%20for%20DallahMzad%20is%20{otp}%20Thank%20You.'
+        payload = f'username={get_sms_id("experttexting")}&from=DEFAULT&to={phone_number}&text={message_text}&type=unicode'
         headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
         }
@@ -485,7 +490,7 @@ def send_sms_expertexting(phone_number,otp):
         
         
     except Exception as e:
-        frappe.throw("Error in qr sending SMS   " + str(e))   
+        return "Error in qr sending SMS   " + str(e) 
 
 
 @frappe.whitelist(allow_guest=True)
@@ -612,8 +617,8 @@ def make_payment_entry(
             frappe.db.rollback()
             frappe.log_error(title='Payment Entry failed to JV',message=frappe.get_traceback())
             frappe.flags.deferred_accounting_error = True
-            # return str(e)
-            return  Response(json.dumps({"data": "There was an error in creating JV", "message": "Use token with higher privilage to enter JV" }), status=401, mimetype='application/json')
+            return str(e)
+            # return  Response(json.dumps({"data": "There was an error in creating JV", "message": "Use token with higher privilage to enter JV" }), status=401, mimetype='application/json')
         
 
 
@@ -647,5 +652,25 @@ def _get_customer_details(user_email = None, mobile_phone = None):
 @frappe.whitelist(allow_guest=True)
 def get_account_balance(customer):
     return  get_balance_on(party_type="Customer", party=customer)
+    
+@frappe.whitelist(allow_guest=True)
+def create_refresh_token(refresh_token):
+   
+
+    url = frappe.local.conf.host_name  + "/api/method/frappe.integrations.oauth2.get_token"
+    
+    payload = f'grant_type=refresh_token&refresh_token={refresh_token}'
+    headers = {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+
+    response = requests.post(url, headers=headers, data=payload)
+
+    return response.text
+
+
+
+
+        
 
     
