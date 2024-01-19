@@ -65,7 +65,9 @@ def generate_token_secure( api_key, api_secret, app_key):
         headers = {"Content-Type": "application/json"}
         response = requests.request("POST", url, data=payload, files=files)
         if response.status_code == 200:
-            return json.loads(response.text)
+            result_data = json.loads(response.text)
+            return Response(json.dumps({"data":result_data}), status=200, mimetype='application/json')
+            
         else:
             frappe.local.response.http_status_code = 401
             return json.loads(response.text)
@@ -79,6 +81,7 @@ def generate_token_secure( api_key, api_secret, app_key):
         
 @frappe.whitelist(allow_guest=True)
 def generate_token_secure_for_users( username, password, app_key):
+    
     # return Response(json.dumps({"message": "2222 Security Parameters are not valid" , "user_count": 0}), status=401, mimetype='application/json')
     frappe.log_error(title='Login attempt',message=str(username) + "    " + str(password) + "    " + str(app_key + "  "))
     try:
@@ -108,11 +111,13 @@ def generate_token_secure_for_users( username, password, app_key):
         response = requests.request("POST", url, data=payload, files=files)
         if response.status_code == 200:
             response_data = json.loads(response.text)
-            response_data['Email'],response_data['Full_name'], response_data['Phone_number'],response_data['QID'] = _get_customer_details(user_email=username)      
-            return response_data
+            # response_data['Email'],response_data['Full_name'], response_data['Phone_number'],response_data['QID'] = _get_customer_details(user_email=username)
+            # response_data['Email'],response_data['Full_name'], response_data['Phone_number'] #,response_data['QID'] = "myqid"      
+            return Response(json.dumps({"data":response_data}), status=200, mimetype='application/json')
         else:
             frappe.local.response.http_status_code = 401
             return json.loads(response.text)
+            
             
     except Exception as e:
             # frappe.local.response.http_status_code = 401
@@ -319,7 +324,7 @@ def g_generate_reset_password_key(user, send_email=False, password_expired=False
         url = "/update-password?key=" + key
         if password_expired:
             url = "/update-password?key=" + key + "&password_expired=true"
-        send_sms_expertexting(mobile,key)
+        # send_sms_expertexting(mobile,key)  # stop this on testing cycle as it send SMSes
         link = get_url(url)
         if send_email:
             User.password_reset_mail(link)
@@ -654,23 +659,50 @@ def get_account_balance(customer):
     return  get_balance_on(party_type="Customer", party=customer)
     
 @frappe.whitelist(allow_guest=True)
-def create_refresh_token(refresh_token):
-   
 
-    url = frappe.local.conf.host_name  + "/api/method/frappe.integrations.oauth2.get_token"
-    
+def create_refresh_token(refresh_token):
+    url =  frappe.local.conf.host_name  + "/api/method/frappe.integrations.oauth2.get_token"
     payload = f'grant_type=refresh_token&refresh_token={refresh_token}'
     headers = {
-      'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded'
     }
+    files = []
+    
+    response = requests.post(url, headers=headers, data=payload, files=files)
 
-    response = requests.post(url, headers=headers, data=payload)
+    # Check if the request was successful
+    if response.status_code == 200:
+        try:
+            # Parse the JSON string in the response message
+            message_json = json.loads(response.text)
+            
+            # Create the new message format
+            new_message = {
+                "access_token": message_json["access_token"],
+                "expires_in": message_json["expires_in"],
+                "token_type": message_json["token_type"],
+                "scope": message_json["scope"],
+                "refresh_token": message_json["refresh_token"]
+            }
 
-    return response.text
+            # Return the new message format directly
+            return  Response(json.dumps({"data": new_message}), status=200, mimetype='application/json')
+        except json.JSONDecodeError as e:
+            return  Response(json.dumps({"data": f"Error decoding JSON: {e}"}), status=401, mimetype='application/json')
+    else:
+        # If the request was not successful, return the original response text
+        return  Response(json.dumps({"data": response.text}), status=401, mimetype='application/json')
 
-
-
-
-        
 
     
+
+    
+
+    
+
+
+
+
+            
+
+        
