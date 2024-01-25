@@ -79,7 +79,7 @@ def generate_token_secure( api_key, api_secret, app_key):
         
         
         
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=False)
 def generate_token_secure_for_users( username, password, app_key):
     
     # return Response(json.dumps({"message": "2222 Security Parameters are not valid" , "user_count": 0}), status=401, mimetype='application/json')
@@ -214,12 +214,13 @@ def get_user_name(user_email = None, mobile_phone = None):
     elif user_email is not None:
         user_details = frappe.get_list('User', filters={'email': user_email}, fields=["name", "enabled"] )
     else:
-        return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')
+        return  Response(json.dumps({"data": "User not found" , "user_count": 0}), status=404, mimetype='application/json')
     
     if len(user_details) >=1:
-        return  user_details
+        return  Response(json.dumps({"data":user_details , "user_count": 0}), status=200, mimetype='application/json')
+
     else:
-        return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')
+        return  Response(json.dumps({"data": "User not found" , "user_count": 0}), status=404, mimetype='application/json')
 
 def check_user_name(user_email = None, mobile_phone = None):
     if mobile_phone is not None:
@@ -655,9 +656,21 @@ def _get_customer_details(user_email = None, mobile_phone = None):
         return  Response(json.dumps({"message": "Customer not found" , "user_count": 0}), status=404, mimetype='application/json')
     
 @frappe.whitelist(allow_guest=True)
-def get_account_balance(customer):
-    return  get_balance_on(party_type="Customer", party=customer)
-    
+def get_account_balance(customer=None):
+    response_content =frappe.session.user
+    if customer:
+
+        balance=  get_balance_on(party_type="Customer", party=customer)
+        result={
+            "balance":balance
+        }
+        return  Response(json.dumps({"data":result}), status=200, mimetype='application/json')
+    else:
+        balance=  get_balance_on(party_type="Customer", party=response_content)
+        result={
+            "balance":balance
+        }
+    return  Response(json.dumps({"data":result}), status=200, mimetype='application/json')
 @frappe.whitelist(allow_guest=True)
 
 def create_refresh_token(refresh_token):
