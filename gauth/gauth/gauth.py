@@ -109,12 +109,25 @@ def generate_token_secure_for_users( username, password, app_key):
         files = []
         headers = {"Content-Type": "application/json"}
         response = requests.request("POST", url, data=payload, files=files)
+        var=frappe.get_list("User",fields=["name as user_id","full_name","email","mobile_no as phone"], filters={'name': ['like',username],})
+        for item in var:
+            if "phone" in item and item["phone"] is not None:
+                item["phone"] = int(item["phone"])
+        
+            
         if response.status_code == 200:
             response_data = json.loads(response.text)
+            result={
+                "token":response_data,
+                "user_details":var
+                    
+                
+            }
             # response_data['Email'],response_data['Full_name'], response_data['Phone_number'],response_data['QID'] = _get_customer_details(user_email=username)
             # response_data['Email'],response_data['Full_name'], response_data['Phone_number'] #,response_data['QID'] = "myqid"      
-            return Response(json.dumps({"data":response_data}), status=200, mimetype='application/json')
+            return Response(json.dumps({"data":result}), status=200, mimetype='application/json')
         else:
+           
             frappe.local.response.http_status_code = 401
             return json.loads(response.text)
             
@@ -316,6 +329,8 @@ def g_update_password(username, password):
 @frappe.whitelist()
 def g_generate_reset_password_key(user, send_email=False, password_expired=False, mobile ="55124924"):
     try:
+        if(len(frappe.get_all('User', {'name': user}))<1):
+            return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')   
         key  = str(random.randint(100000, 999999))
         doc2 = frappe.get_doc("User", user)
         doc2.reset_password_key = key
@@ -658,18 +673,10 @@ def _get_customer_details(user_email = None, mobile_phone = None):
 @frappe.whitelist(allow_guest=True)
 def get_account_balance(customer=None):
     response_content =frappe.session.user
-    if customer:
-
-        balance=  get_balance_on(party_type="Customer", party=customer)
-        result={
-            "balance":balance
-        }
-        return  Response(json.dumps({"data":result}), status=200, mimetype='application/json')
-    else:
-        balance=  get_balance_on(party_type="Customer", party=response_content)
-        result={
-            "balance":balance
-        }
+    balance=  get_balance_on(party_type="Customer", party=response_content)
+    result={
+        "balance":balance
+    }
     return  Response(json.dumps({"data":result}), status=200, mimetype='application/json')
 @frappe.whitelist(allow_guest=True)
 
@@ -707,8 +714,21 @@ def create_refresh_token(refresh_token):
         return  Response(json.dumps({"data": response.text}), status=401, mimetype='application/json')
 
 
+@frappe.whitelist(allow_guest=True)
+def test_redirect_url():
+    redirect_url = "https://doodles.google/search/"
     
-
+    response_data = {
+        'data': 'Redirecting to here',
+        'redirect_url': redirect_url
+    }
+    
+    # return {
+    #     'status': 'redirect',
+    #     'location': "https://doodles.google/search/"
+    return  Response(json.dumps(response_data), status=303, mimetype='text/html; charset=utf-8')
+    
+    # }
     
 
     
