@@ -99,12 +99,12 @@ curl --location --request GET 'api/method/gauth.gauth.gauth.is_user_available' \
 
 ```
 curl --location 'api/method/gauth.gauth.gauth.g_create_user' \
---header 'Authorization: Bearer 3FXrkLLCsFZL9GvU3kXOIcaCtnBrqB' \
+--header 'Authorization: Bearer YourBearerToken' \
 --header 'Cookie: full_name=Guest; sid=Guest; system_user=yes; user_id=Guest; user_image=' \
---form 'full_name="Aysha"' \
---form 'password="Friday2000@$"' \
+--form 'full_name="Your Name"' \
+--form 'password="YourPassword"' \
 --form 'mobile_no="323232243"' \
---form 'email="72763671@erpgulf.com"' \
+--form 'email="youremail@erpgulf.com"' \
 --form 'role="Auction"' \
 --form 'id=""'
 
@@ -189,10 +189,10 @@ curl --location --request GET 'api/method/gauth.gauth.gauth.get_user_name' \
 
 ```
 curl --location 'api/method/gauth.gauth.gauth.g_update_password' \
---header 'Authorization: Bearer IYPuOij4ywRPGHEfWQJgYNdrJxzUzh' \
+--header 'Authorization: Bearer YourToken' \
 --header 'Cookie: full_name=Guest; sid=Guest; system_user=yes; user_id=Guest; user_image=' \
---form 'username="72763671@erpgulf.com"' \
---form 'password="Friday"'
+--form 'username="youruser@erpgulf.com"' \
+--form 'password="YourPassword"'
 ```
 ### Response
 ```

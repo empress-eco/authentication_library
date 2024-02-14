@@ -11,6 +11,7 @@ from mimetypes import guess_type
 from typing import TYPE_CHECKING
 from werkzeug.wrappers import Response
 from frappe.utils.password import update_password as _update_password
+from frappe.core.doctype.user.user import update_password as _update_password_reset_key
 from frappe.utils import now
 import random
 from frappe.core.doctype.user.user import User
@@ -685,7 +686,7 @@ def get_account_balance(customer=None):
     response_content =frappe.session.user
     balance=  get_balance_on(party_type="Customer", party=response_content)
     result={
-        "balance":balance
+        "balance": 0-balance
     }
     return  Response(json.dumps({"data":result}), status=200, mimetype='application/json')
 @frappe.whitelist(allow_guest=True)
@@ -745,7 +746,51 @@ def test_redirect_url():
 
 
 
+@frappe.whitelist()
+def g_update_password_using_usertoken(password):
+    try:
+        username =frappe.session.user
+        if(len(frappe.get_all('User', {'name': username}))<1):
+            return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')    
+        
+        _update_password(username, password, logout_all_sessions=True)
+        qid=frappe.get_list("Customer", fields=["name as id","custom_full_name as  full_name","custom_mobile_number as phone","name as email","custom_qid as qid"], filters={'name': ['like', username]})
+        result={
+           "message": "Password successfully updated" ,
+           "user_details":qid[0] if qid else {} 
+        }
+        # frappe.db.commit()
+        return  Response(json.dumps({"data":result }), status=200, mimetype='application/json')
+        
+    except Exception as e:
+        return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
 
             
+@frappe.whitelist(allow_guest=True)
+def g_update_password_using_reset_key(new_password,reset_key,username):
+    try:
+        
+        if(len(frappe.get_all('User', {'name': username}))<1):
+            return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')  
+        
+        res =  _update_password_reset_key(new_password=new_password, key=reset_key)
+        # if res.get("message"):
+        # return  frappe.local.response.http_status_code
+        if frappe.local.response.http_status_code == 410:
+            return  Response(json.dumps({"message": "Reset key not valid or expired"  , "user_count": 0}), status=401, mimetype='application/json')
+        # return res["message"]
+	    
+        
+        
+        qid=frappe.get_list("Customer", fields=["name as id","custom_full_name as  full_name","custom_mobile_number as phone","name as email","custom_qid as qid"], filters={'name': ['like', username]})
+        result={
+           "message": "Password successfully updated" ,
+           "user_details":qid[0] if qid else {} 
+        }
+        # frappe.db.commit()
+        return  Response(json.dumps({"data":result }), status=200, mimetype='application/json')
+        
+    except Exception as e:
+        return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
 
         
