@@ -109,25 +109,18 @@ def generate_token_secure_for_users( username, password, app_key):
         files = []
         headers = {"Content-Type": "application/json"}
         response = requests.request("POST", url, data=payload, files=files)
-        var=frappe.get_list("User",fields=["name as user_id","full_name","email","mobile_no as phone"], filters={'name': ['like',username],})
-        for item in var:
-            if "phone" in item and item["phone"] is not None:
-                item["phone"] = int(item["phone"])
-        
-            
+        # var = frappe.get_list("Customer", fields=["name as id", "full_name","email", "mobile_no as phone",], filters={'name': ['like', username]})
+        qid=frappe.get_list("Customer", fields=["name as id","custom_full_name as  full_name","custom_mobile_number as phone","name as email","custom_qid as qid"], filters={'name': ['like', username]})
         if response.status_code == 200:
             response_data = json.loads(response.text)
-            result={
-                "token":response_data,
-                "user_details":var
-                    
-                
+            
+            result = {
+                "token": response_data,
+                "user": qid[0] if qid else {} 
             }
-            # response_data['Email'],response_data['Full_name'], response_data['Phone_number'],response_data['QID'] = _get_customer_details(user_email=username)
-            # response_data['Email'],response_data['Full_name'], response_data['Phone_number'] #,response_data['QID'] = "myqid"      
-            return Response(json.dumps({"data":result}), status=200, mimetype='application/json')
+            return Response(json.dumps({"data": result}), status=200, mimetype='application/json')
         else:
-           
+                
             frappe.local.response.http_status_code = 401
             return json.loads(response.text)
             
@@ -144,7 +137,7 @@ def generate_token_secure_for_users( username, password, app_key):
 def generate_custom_token(username, password):  #Used for development testing only. not for production
     
     #this function can be used for development testing only. not for production. Uncomment the below code to use it.
-    return Response(json.dumps({"message": "Can not be used for production environmet" , "user_count": 0}), status=500, mimetype='application/json')
+    # return Response(json.dumps({"message": "Can not be used for production environmet" , "user_count": 0}), status=500, mimetype='application/json')
     #------------
     
     try:
@@ -167,10 +160,13 @@ def generate_custom_token(username, password):  #Used for development testing on
         else:
             frappe.local.response.http_status_code = 401
             return json.loads(response.text)
+           
             
     except Exception as e:
             frappe.local.response.http_status_code = 401
             return json.loads(response.text)
+
+
             
 @frappe.whitelist(allow_guest=True)
 def generate_custom_token_for_employee( password):
@@ -279,39 +275,47 @@ def is_user_available(user_email = None, mobile_phone = None):
             
 
 @frappe.whitelist()
-def g_create_user(full_name, password, mobile_no, email, id,role=None):
-    # return "inside g_create_user"
-    # return check_user_name(user_email=email, mobile_phone=mobile_no)
-    if(check_user_name(user_email=email, mobile_phone=mobile_no)>0):
-        return  Response(json.dumps({"message": "User already exists" , "user_count": 1}), status=409, mimetype='application/json')
-    
-    try:
-        frappe.get_doc({"doctype":"User",
-                        "name":email,
-                        "first_name":full_name,
-                        "mobile_no":mobile_no,
-                        "email": email,
-                        "roles": [{"role": role}]
-                        }).insert()
-        
-        frappe.get_doc({"doctype":"Customer",
-                        "name":email,
-                        "customer_name": email,
-                        "custom_user": email,
-                        "custom_full_name":full_name,
-                        "custom_mobile_number":mobile_no,
-                        "email": email,
-                        "custom_qid": id,
-                        }).insert()
-        
-        
-        return g_generate_reset_password_key(email, send_email=False, password_expired=False,mobile= mobile_no)
+def g_create_user(full_name, password, mobile_no, email,qid, role=None):
+    # Check if the user already exists
+    if check_user_name(user_email=email, mobile_phone=mobile_no) > 0:
+        return Response(json.dumps({"message": "User already exists", "user_count": 1}), status=409, mimetype='application/json')
 
-        # return  Response(json.dumps({"message": "User successfully created" , "user_count": 1}), status=200, mimetype='application/json')
-        
+    try:
+        # Validate custom_qid length
+        if not (qid.isdigit() and len(qid) == 11):
+            raise ValueError("Invalid custom_qid. It should be exactly 11 digits.")
+
+        # Create User document
+        frappe.get_doc({
+            "doctype": "User",
+            "name": email,
+            "first_name": full_name,
+            "mobile_no": mobile_no,
+            "email": email,
+            "roles": [{"role": role}]
+        }).insert()
+
+        # Create Customer document
+        frappe.get_doc({
+            "doctype": "Customer",
+            "name": email,
+            "customer_name": email,
+            "custom_user": email,
+            "custom_full_name": full_name,
+            "custom_mobile_number": mobile_no,
+            "email": email,
+            "custom_qid": qid
+        }).insert()
+
+        # Generate reset password key
+        return g_generate_reset_password_key(email, send_email=False, password_expired=False, mobile=mobile_no)
+
+    except ValueError as ve:
+        return Response(json.dumps({"message": str(ve), "user_count": 0}), status=400, mimetype='application/json')
+
     except Exception as e:
-        return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
-    
+        return Response(json.dumps({"message": str(e), "user_count": 0}), status=500, mimetype='application/json')
+
 
 @frappe.whitelist()
 def g_update_password(username, password):
@@ -320,8 +324,13 @@ def g_update_password(username, password):
             return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')    
         
         _update_password(username, password, logout_all_sessions=True)
+        qid=frappe.get_list("Customer", fields=["name as id","custom_full_name as  full_name","custom_mobile_number as phone","name as email","custom_qid as qid"], filters={'name': ['like', username]})
+        result={
+           "message": "Password successfully updated" ,
+           "user_details":qid[0] if qid else {} 
+        }
         # frappe.db.commit()
-        return  Response(json.dumps({"message": "Password successfully updated" , "user_count": 1}), status=200, mimetype='application/json')
+        return  Response(json.dumps({"data":result }), status=200, mimetype='application/json')
         
     except Exception as e:
         return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
@@ -350,12 +359,13 @@ def g_generate_reset_password_key(user, send_email=False, password_expired=False
         return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
 
 @frappe.whitelist()
-def g_delete_user(username, email, mobile_no):
+def g_delete_user(id, email, mobile_no):
     try:
-        if(len(frappe.get_all('User', {"name":username, "email": email, "mobile_no": mobile_no}))<1):
+        if(len(frappe.get_all('User', {"name":id, "email": email, "mobile_no": mobile_no}))<1):
             return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')    
         
-        frappe.db.delete("User", {"name":username, "email": email, "mobile_no": mobile_no}),
+        frappe.db.delete("User", {"name":id, "email": email, "mobile_no": mobile_no}),
+        frappe.db.delete("Customer", {"name":id, "customer_name": email, "custom_mobile_number": mobile_no})
         return  Response(json.dumps({"message": "User successfully deleted" , "user_count": 1}), status=200, mimetype='application/json')
         
     except Exception as e:
