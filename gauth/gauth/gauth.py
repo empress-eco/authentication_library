@@ -350,7 +350,7 @@ def g_generate_reset_password_key(user, send_email=False, password_expired=False
         url = "/update-password?key=" + key
         if password_expired:
             url = "/update-password?key=" + key + "&password_expired=true"
-        # send_sms_expertexting(mobile,key)  # stop this on testing cycle as it send SMSes
+        send_sms_expertexting(mobile,key)  # stop this on testing cycle as it send SMSes
         link = get_url(url)
         if send_email:
             User.password_reset_mail(link)
