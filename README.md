@@ -44,9 +44,9 @@ This API is designed to securely generate authentication tokens for users based 
 ```
 curl --location '/api/method/gauth.gauth.gauth.generate_token_secure_for_users' \
 --header 'Cookie: full_name=Guest; sid=Guest; system_user=no; user_id=Guest; user_image=; full_name=Guest; sid=Guest; system_user=yes; user_id=Guest; user_image=; full_name=Guest; sid=Guest; system_user=yes; user_id=Guest; user_image=' \
---header 'Authorization: Bearer 3FXrkLLCsFZL9GvU3kXOIcaCtnBrqB' \
---form 'api_key="73935669a6be77a@erpgulf.com"' \
---form 'api_secret="K9sLpQvZrFyWm7N3"' \
+--header 'Authorization: Bearer your bearer token' \
+--form 'api_key="your api key"' \
+--form 'api_secret=""' \
 --form 'app_key="MzM1ZjdkMmUzMzgxNjM1NWJiNWQwYzE3YjY3YjMyZDU5N2E3ODRhZmE5NjU0N2RiMWVjZGE0ZjE4OGM1MmM1MQ=="' \
 --form 'client_secret="cfd619c909"' \
 --form 'username="rishal@testgmail.com1"' \
@@ -67,7 +67,7 @@ curl --location '/api/method/gauth.gauth.gauth.generate_token_secure_for_users' 
             "id": "rishal@testgmail.com1",
             "full_name": "rishal",
             "email": "rishal@testgmail.com1",
-            "phone": "12398712312"
+            "phone": "your mobile number"
         }
     }
 }
@@ -82,7 +82,7 @@ This api checks the availability of a user based on either their email or mobile
 curl --location --request GET 'api/method/gauth.gauth.gauth.is_user_available' \
 --header 'Authorization: Bearer 3FXrkLLCsFZL9GvU3kXOIcaCtnBrqB' \
 --header 'Cookie: full_name=Guest; sid=Guest; system_user=yes; user_id=Guest; user_image=' \
---form 'mobile_phone="55124924"' \
+--form 'mobile_phone=""' \
 --form 'user_email="mumtaz32@erpgulf.com3"'
 ```
 ### Response
