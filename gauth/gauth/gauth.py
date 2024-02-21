@@ -337,7 +337,10 @@ def g_update_password(username, password):
         return  Response(json.dumps({"message": e , "user_count": 0}), status=500, mimetype='application/json')
     
 @frappe.whitelist()
-def g_generate_reset_password_key(user, send_email=False, password_expired=False, mobile ="55124924"):
+def g_generate_reset_password_key(user, mobile="", send_email=False, password_expired=False,):
+    
+    if  mobile=="" :
+       return  Response(json.dumps({"message": "Mobile number not found" , "user_count": 0}), status=404, mimetype='application/json')   
     try:
         if(len(frappe.get_all('User', {'name': user}))<1):
             return  Response(json.dumps({"message": "User not found" , "user_count": 0}), status=404, mimetype='application/json')   
